@@ -116,7 +116,7 @@ function Settings() {
 
     try {
       const response = await fetch(
-        "http://localhost:8080/api/auth/reset-password",
+        "https://stokemate-backend.onrender.com/api/auth/reset-password",
         {
           method: "PUT",
           headers: {
@@ -192,7 +192,7 @@ function Settings() {
 
     try {
       const response = await fetch(
-        "http://localhost:8080/api/auth/delete-account",
+        "https://stokemate-backend.onrender.com/api/auth/delete-account",
         {
           method: "DELETE",
           headers: {
