@@ -7,7 +7,7 @@ import {
 
 const InventoryContext = createContext(null);
 
-const API_URL = "http://localhost:8080/api/products";
+const API_URL = "https://stokemate-backend.onrender.com/api/products";
 
 export function InventoryProvider({ children }) {
   const [products, setProducts] = useState([]);
