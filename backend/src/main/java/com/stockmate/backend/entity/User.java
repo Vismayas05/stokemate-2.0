@@ -1,4 +1,3 @@
-
 package com.stockmate.backend.entity;
 
 import jakarta.persistence.*;

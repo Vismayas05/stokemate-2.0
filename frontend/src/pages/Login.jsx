@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import {
   ArrowRight,
   Boxes,
@@ -86,13 +87,11 @@ function Login() {
         );
       }
 
-      // Save complete login response
       localStorage.setItem(
         "stockmate-user",
         JSON.stringify(data)
       );
 
-      // Get profile details from backend or signup storage
       const savedName =
         data?.name ||
         data?.user?.name ||
@@ -111,14 +110,11 @@ function Login() {
         );
       }
 
-      // Save current logged-in user's email
       localStorage.setItem(
         "stockmate-email",
         savedEmail
       );
 
-      // Clear old user's products and load
-      // the current user's products
       switchUser(savedEmail);
 
       navigate("/dashboard");
@@ -132,6 +128,94 @@ function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Google Sign-In
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        "https://stokemate-backend.onrender.com/api/auth/google",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential: credentialResponse.credential,
+          }),
+        }
+      );
+
+      const responseText = await response.text();
+
+      let data = {};
+
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = {
+          message: responseText,
+        };
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Google sign-in failed"
+        );
+      }
+
+      localStorage.setItem(
+        "stockmate-user",
+        JSON.stringify(data)
+      );
+
+      const savedName =
+        data?.name ||
+        data?.user?.name ||
+        "StockMate User";
+
+      const savedEmail = (
+        data?.email ||
+        data?.user?.email ||
+        ""
+      ).trim().toLowerCase();
+
+      if (savedName) {
+        localStorage.setItem(
+          "stockmate-name",
+          savedName
+        );
+      }
+
+      if (savedEmail) {
+        localStorage.setItem(
+          "stockmate-email",
+          savedEmail
+        );
+      }
+
+      switchUser(savedEmail);
+
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Google login error:", error);
+
+      setError(
+        error.message ||
+          "Unable to sign in with Google"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError(
+      "Google sign-in failed. Please try again."
+    );
   };
 
   const isDark = theme === "dark";
@@ -518,9 +602,23 @@ function Login() {
               <div className="h-px flex-1 bg-border" />
             </div>
 
+            {/* Google Sign In */}
+
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                useOneTap={false}
+                theme={isDark ? "filled_black" : "outline"}
+                size="large"
+                text="continue_with"
+                shape="pill"
+              />
+            </div>
+
             {/* Signup */}
 
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="mt-6 text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
 
               <Link
