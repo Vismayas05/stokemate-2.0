@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
@@ -23,7 +22,6 @@ import { useInventory } from "../context/InventoryContext";
 function Login() {
   const navigate = useNavigate();
   const { theme } = useTheme();
-
   const { switchUser } = useInventory();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -36,6 +34,10 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const API_URL =
+    import.meta.env.VITE_API_URL ||
+    "http://localhost:8080";
+
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -44,6 +46,10 @@ function Login() {
       [name]: value,
     }));
   };
+
+  // --------------------------------------------------
+  // NORMAL LOGIN
+  // --------------------------------------------------
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -56,7 +62,7 @@ function Login() {
 
     try {
       const response = await fetch(
-        "https://stokemate-backend.onrender.com/api/auth/login",
+        `${API_URL}/api/auth/login`,
         {
           method: "POST",
           headers: {
@@ -83,10 +89,24 @@ function Login() {
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Invalid email or password"
+          data?.message ||
+            "Invalid email or password"
         );
       }
 
+      // JWT TOKEN
+      if (!data?.token) {
+        throw new Error(
+          "Login succeeded, but no authentication token was received."
+        );
+      }
+
+      localStorage.setItem(
+        "stockmate-token",
+        data.token
+      );
+
+      // Store complete login response
       localStorage.setItem(
         "stockmate-user",
         JSON.stringify(data)
@@ -95,13 +115,17 @@ function Login() {
       const savedName =
         data?.name ||
         data?.user?.name ||
-        localStorage.getItem("stockmate-name");
+        localStorage.getItem(
+          "stockmate-name"
+        );
 
       const savedEmail = (
         data?.email ||
         data?.user?.email ||
         email
-      ).trim().toLowerCase();
+      )
+        .trim()
+        .toLowerCase();
 
       if (savedName) {
         localStorage.setItem(
@@ -115,14 +139,16 @@ function Login() {
         savedEmail
       );
 
+      // Tell InventoryContext which user is logged in
       switchUser(savedEmail);
 
+      // Go to protected dashboard
       navigate("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
 
       setError(
-        error.message ||
+        error?.message ||
           "Unable to connect to the server"
       );
     } finally {
@@ -130,21 +156,33 @@ function Login() {
     }
   };
 
-  // Google Sign-In
-  const handleGoogleSuccess = async (credentialResponse) => {
+  // --------------------------------------------------
+  // GOOGLE LOGIN
+  // --------------------------------------------------
+
+  const handleGoogleSuccess = async (
+    credentialResponse
+  ) => {
     setLoading(true);
     setError("");
 
     try {
+      if (!credentialResponse?.credential) {
+        throw new Error(
+          "Google did not return a valid credential."
+        );
+      }
+
       const response = await fetch(
-        "https://stokemate-backend.onrender.com/api/auth/google",
+        `${API_URL}/api/auth/google`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            credential: credentialResponse.credential,
+            credential:
+              credentialResponse.credential,
           }),
         }
       );
@@ -163,10 +201,24 @@ function Login() {
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Google sign-in failed"
+          data?.message ||
+            "Google sign-in failed"
         );
       }
 
+      // JWT TOKEN
+      if (!data?.token) {
+        throw new Error(
+          "Google sign-in succeeded, but no authentication token was received."
+        );
+      }
+
+      localStorage.setItem(
+        "stockmate-token",
+        data.token
+      );
+
+      // Store complete login response
       localStorage.setItem(
         "stockmate-user",
         JSON.stringify(data)
@@ -181,7 +233,9 @@ function Login() {
         data?.email ||
         data?.user?.email ||
         ""
-      ).trim().toLowerCase();
+      )
+        .trim()
+        .toLowerCase();
 
       if (savedName) {
         localStorage.setItem(
@@ -197,20 +251,29 @@ function Login() {
         );
       }
 
+      // Tell InventoryContext which user is logged in
       switchUser(savedEmail);
 
+      // Go to protected dashboard
       navigate("/dashboard");
     } catch (error) {
-      console.error("Google login error:", error);
+      console.error(
+        "Google login error:",
+        error
+      );
 
       setError(
-        error.message ||
+        error?.message ||
           "Unable to sign in with Google"
       );
     } finally {
       setLoading(false);
     }
   };
+
+  // --------------------------------------------------
+  // GOOGLE LOGIN ERROR
+  // --------------------------------------------------
 
   const handleGoogleError = () => {
     setError(
@@ -284,9 +347,17 @@ function Login() {
             <BrandLogo light={isDark} />
 
             <motion.div
-              initial={{ opacity: 0, y: 25 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
+              initial={{
+                opacity: 0,
+                y: 25,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              transition={{
+                duration: 0.8,
+              }}
               className="mt-24 max-w-lg"
             >
               <div
@@ -297,12 +368,14 @@ function Login() {
                 }`}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+
                 Intelligent inventory workspace
               </div>
 
               <h2 className="text-5xl font-bold leading-[1.08] tracking-tight">
                 Everything in
                 <br />
+
                 <span className="text-emerald-500">
                   its place.
                 </span>
@@ -315,8 +388,9 @@ function Login() {
                     : "text-slate-600"
                 }`}
               >
-                Track products, manage stock, and understand
-                your business through a simple and organized
+                Track products, manage stock,
+                and understand your business
+                through a simple and organized
                 inventory system.
               </p>
             </motion.div>
@@ -325,11 +399,28 @@ function Login() {
           {/* Animated Cards */}
 
           <div className="relative z-10 mt-12 h-64">
+
+            {/* Inventory Card */}
+
             <motion.div
-              initial={{ opacity: 0, y: 40, rotate: -7 }}
-              animate={{ opacity: 1, y: 0, rotate: -7 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              whileHover={{ y: -8, rotate: -3 }}
+              initial={{
+                opacity: 0,
+                y: 40,
+                rotate: -7,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                rotate: -7,
+              }}
+              transition={{
+                duration: 0.8,
+                delay: 0.3,
+              }}
+              whileHover={{
+                y: -8,
+                rotate: -3,
+              }}
               className={`absolute left-2 top-2 w-60 rounded-3xl border p-5 shadow-2xl backdrop-blur-xl ${
                 isDark
                   ? "border-white/10 bg-white/[0.07]"
@@ -337,6 +428,7 @@ function Login() {
               }`}
             >
               <div className="flex items-center justify-between">
+
                 <div className="rounded-xl bg-emerald-500/15 p-3 text-emerald-500">
                   <Boxes size={23} />
                 </div>
@@ -361,32 +453,55 @@ function Login() {
               </p>
 
               <div className="mt-5 flex gap-1">
-                {Array.from({ length: 8 }).map(
-                  (_, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ height: 8 }}
-                      animate={{
-                        height: [8, 20 + index * 4, 12],
-                      }}
-                      transition={{
-                        duration: 2,
-                        delay: index * 0.08,
-                        repeat: Infinity,
-                        repeatType: "reverse",
-                      }}
-                      className="flex-1 rounded-full bg-emerald-500"
-                    />
-                  )
-                )}
+                {Array.from({
+                  length: 8,
+                }).map((_, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{
+                      height: 8,
+                    }}
+                    animate={{
+                      height: [
+                        8,
+                        20 + index * 4,
+                        12,
+                      ],
+                    }}
+                    transition={{
+                      duration: 2,
+                      delay: index * 0.08,
+                      repeat: Infinity,
+                      repeatType:
+                        "reverse",
+                    }}
+                    className="flex-1 rounded-full bg-emerald-500"
+                  />
+                ))}
               </div>
             </motion.div>
 
+            {/* Analytics Card */}
+
             <motion.div
-              initial={{ opacity: 0, y: 50, rotate: 8 }}
-              animate={{ opacity: 1, y: 0, rotate: 8 }}
-              transition={{ duration: 0.8, delay: 0.5 }}
-              whileHover={{ y: -8, rotate: 4 }}
+              initial={{
+                opacity: 0,
+                y: 50,
+                rotate: 8,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                rotate: 8,
+              }}
+              transition={{
+                duration: 0.8,
+                delay: 0.5,
+              }}
+              whileHover={{
+                y: -8,
+                rotate: 4,
+              }}
               className={`absolute right-2 top-20 w-60 rounded-3xl border p-5 shadow-2xl backdrop-blur-xl ${
                 isDark
                   ? "border-white/10 bg-white/[0.07]"
@@ -394,6 +509,7 @@ function Login() {
               }`}
             >
               <div className="flex items-center justify-between">
+
                 <div className="rounded-xl bg-cyan-500/15 p-3 text-cyan-500">
                   <TrendingUp size={23} />
                 </div>
@@ -418,20 +534,33 @@ function Login() {
               </p>
 
               <div className="mt-5 flex items-end gap-1">
-                {[25, 38, 30, 55, 42, 70, 58, 88].map(
-                  (height, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ height: 0 }}
-                      animate={{ height }}
-                      transition={{
-                        duration: 0.7,
-                        delay: 0.6 + index * 0.08,
-                      }}
-                      className="flex-1 rounded-t-md bg-cyan-500/70"
-                    />
-                  )
-                )}
+                {[
+                  25,
+                  38,
+                  30,
+                  55,
+                  42,
+                  70,
+                  58,
+                  88,
+                ].map((height, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{
+                      height: 0,
+                    }}
+                    animate={{
+                      height,
+                    }}
+                    transition={{
+                      duration: 0.7,
+                      delay:
+                        0.6 +
+                        index * 0.08,
+                    }}
+                    className="flex-1 rounded-t-md bg-cyan-500/70"
+                  />
+                ))}
               </div>
             </motion.div>
           </div>
@@ -441,6 +570,7 @@ function Login() {
               size={15}
               className="text-emerald-500"
             />
+
             Built for simple and organized business management
           </div>
         </section>
@@ -449,24 +579,48 @@ function Login() {
 
         <section className="relative flex items-center justify-center overflow-hidden bg-background px-6 py-12 transition-colors duration-300 sm:px-12">
 
+          {/* Theme Toggle */}
+
           <div className="absolute right-5 top-5 z-20">
             <ThemeToggle />
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
+            initial={{
+              opacity: 0,
+              y: 25,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            transition={{
+              duration: 0.7,
+            }}
             className="w-full max-w-md"
           >
+
+            {/* Mobile Logo */}
+
             <div className="mb-12 lg:hidden">
               <BrandLogo />
             </div>
 
+            {/* Heading */}
+
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.15 }}
+              initial={{
+                opacity: 0,
+                scale: 0.95,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+              }}
+              transition={{
+                duration: 0.5,
+                delay: 0.15,
+              }}
               className="mb-8"
             >
               <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
@@ -492,6 +646,7 @@ function Login() {
               onSubmit={handleSubmit}
               className="space-y-5"
             >
+
               {/* Email */}
 
               <div>
@@ -500,6 +655,7 @@ function Login() {
                 </label>
 
                 <div className="flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3 transition-all focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10">
+
                   <Mail
                     size={18}
                     className="text-muted-foreground"
@@ -525,13 +681,18 @@ function Login() {
                 </label>
 
                 <div className="flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3 transition-all focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10">
+
                   <LockKeyhole
                     size={18}
                     className="text-muted-foreground"
                   />
 
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={
+                      showPassword
+                        ? "text"
+                        : "password"
+                    }
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
@@ -543,7 +704,9 @@ function Login() {
                   <button
                     type="button"
                     onClick={() =>
-                      setShowPassword((value) => !value)
+                      setShowPassword(
+                        (value) => !value
+                      )
                     }
                     className="text-muted-foreground transition hover:text-foreground"
                   >
@@ -555,16 +718,19 @@ function Login() {
                   </button>
                 </div>
               </div>
-              <div className="flex justify-end">
-  <Link
-    to="/forgot-password"
-    className="text-sm font-semibold text-emerald-500 transition hover:text-emerald-600"
-  >
-    Forgot password?
-  </Link>
-</div>
 
-              {/* Error Message */}
+              {/* Forgot Password */}
+
+              <div className="flex justify-end">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm font-semibold text-emerald-500 transition hover:text-emerald-600"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
+              {/* Error */}
 
               {error && (
                 <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-500">
@@ -572,7 +738,7 @@ function Login() {
                 </p>
               )}
 
-              {/* Submit Button */}
+              {/* Submit */}
 
               <motion.button
                 whileHover={{
@@ -601,6 +767,7 @@ function Login() {
             {/* Divider */}
 
             <div className="my-8 flex items-center gap-3">
+
               <div className="h-px flex-1 bg-border" />
 
               <span className="text-[10px] font-semibold tracking-widest text-muted-foreground">
@@ -614,10 +781,18 @@ function Login() {
 
             <div className="flex justify-center">
               <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
+                onSuccess={
+                  handleGoogleSuccess
+                }
+                onError={
+                  handleGoogleError
+                }
                 useOneTap={false}
-                theme={isDark ? "filled_black" : "outline"}
+                theme={
+                  isDark
+                    ? "filled_black"
+                    : "outline"
+                }
                 size="large"
                 text="continue_with"
                 shape="pill"
@@ -636,6 +811,8 @@ function Login() {
                 Create account
               </Link>
             </p>
+
+            {/* Security */}
 
             <div className="mt-10 flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck size={14} />

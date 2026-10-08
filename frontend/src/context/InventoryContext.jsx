@@ -7,54 +7,122 @@ import {
 
 const InventoryContext = createContext(null);
 
-const API_URL = "https://stokemate-backend.onrender.com/api/products";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:8080";
+
+const PRODUCTS_URL = `${API_URL}/api/products`;
 
 export function InventoryProvider({ children }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [activeEmail, setActiveEmail] = useState(
-    () => localStorage.getItem("stockmate-email") || ""
+    () =>
+      localStorage.getItem("stockmate-email") || ""
   );
 
-  const getUserEmail = () => {
-    const savedEmail = localStorage.getItem("stockmate-email");
+  // --------------------------------------------------
+  // AUTHENTICATION
+  // --------------------------------------------------
 
-    if (!savedEmail) {
-      throw new Error("Please login again");
+  const getToken = () => {
+    const token =
+      localStorage.getItem("stockmate-token");
+
+    if (!token) {
+      throw new Error(
+        "Your session has expired. Please login again."
+      );
     }
 
-    return savedEmail.trim().toLowerCase();
+    return token;
   };
 
-  const getHeaders = () => ({
-    "Content-Type": "application/json",
-    "X-User-Email": getUserEmail(),
-  });
+  const getHeaders = () => {
+    const token = getToken();
+
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  };
+
+  // --------------------------------------------------
+  // LOAD PRODUCTS
+  // --------------------------------------------------
 
   const loadProducts = async () => {
     try {
       setLoading(true);
 
-      const response = await fetch(API_URL, {
-        method: "GET",
-        headers: getHeaders(),
-      });
+      const response = await fetch(
+        PRODUCTS_URL,
+        {
+          method: "GET",
+          headers: getHeaders(),
+        }
+      );
+
+      if (response.status === 401) {
+        localStorage.removeItem(
+          "stockmate-token"
+        );
+
+        localStorage.removeItem(
+          "stockmate-user"
+        );
+
+        localStorage.removeItem(
+          "stockmate-name"
+        );
+
+        localStorage.removeItem(
+          "stockmate-email"
+        );
+
+        setProducts([]);
+        setActiveEmail("");
+
+        window.location.href = "/";
+
+        return;
+      }
 
       if (!response.ok) {
-        throw new Error("Failed to load products");
+        const errorText =
+          await response.text();
+
+        console.error(
+          "Load products backend error:",
+          errorText
+        );
+
+        throw new Error(
+          "Failed to load products"
+        );
       }
 
       const data = await response.json();
 
-      setProducts(data);
+      setProducts(
+        Array.isArray(data) ? data : []
+      );
     } catch (error) {
-      console.error("Loading products failed:", error);
+      console.error(
+        "Loading products failed:",
+        error
+      );
+
       setProducts([]);
     } finally {
       setLoading(false);
     }
   };
+
+  // --------------------------------------------------
+  // LOAD PRODUCTS WHEN USER CHANGES
+  // --------------------------------------------------
 
   useEffect(() => {
     if (activeEmail) {
@@ -65,12 +133,27 @@ export function InventoryProvider({ children }) {
     }
   }, [activeEmail]);
 
+  // --------------------------------------------------
+  // SWITCH USER
+  // --------------------------------------------------
+
   const switchUser = (email) => {
-    const normalizedEmail = email.trim().toLowerCase();
+    if (!email) {
+      setProducts([]);
+      setActiveEmail("");
+      return;
+    }
+
+    const normalizedEmail =
+      email.trim().toLowerCase();
 
     setProducts([]);
     setActiveEmail(normalizedEmail);
   };
+
+  // --------------------------------------------------
+  // CLEAR INVENTORY / LOGOUT
+  // --------------------------------------------------
 
   const clearInventory = () => {
     setProducts([]);
@@ -78,139 +161,267 @@ export function InventoryProvider({ children }) {
     setLoading(false);
   };
 
+  // --------------------------------------------------
+  // ADD PRODUCT
+  // --------------------------------------------------
+
   const addProduct = async (product) => {
     const newProduct = {
       name: product.name.trim(),
       category: product.category,
-      supplier: product.supplier?.trim() || "",
+      supplier:
+        product.supplier?.trim() || "",
       price: Number(product.price),
       quantity: Number(product.quantity),
-      expiryDate: product.expiryDate || null,
+      expiryDate:
+        product.expiryDate || null,
     };
 
     try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(newProduct),
-      });
+      const response = await fetch(
+        PRODUCTS_URL,
+        {
+          method: "POST",
+          headers: getHeaders(),
+          body: JSON.stringify(newProduct),
+        }
+      );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Backend error:", errorText);
-        throw new Error("Failed to add product");
+      if (response.status === 401) {
+        localStorage.clear();
+        window.location.href = "/";
+        return false;
       }
 
-      const savedProduct = await response.json();
+      if (!response.ok) {
+        const errorText =
+          await response.text();
 
-      setProducts((previousProducts) => [
-        ...previousProducts,
-        savedProduct,
-      ]);
+        console.error(
+          "Add product backend error:",
+          errorText
+        );
+
+        throw new Error(
+          "Failed to add product"
+        );
+      }
+
+      const savedProduct =
+        await response.json();
+
+      setProducts(
+        (previousProducts) => [
+          ...previousProducts,
+          savedProduct,
+        ]
+      );
 
       return true;
     } catch (error) {
-      console.error("Add product error:", error);
+      console.error(
+        "Add product error:",
+        error
+      );
+
       throw error;
     }
   };
 
-  const updateProduct = async (id, updatedProduct) => {
+  // --------------------------------------------------
+  // UPDATE PRODUCT
+  // --------------------------------------------------
+
+  const updateProduct = async (
+    id,
+    updatedProduct
+  ) => {
     const productData = {
       name: updatedProduct.name.trim(),
       category: updatedProduct.category,
-      supplier: updatedProduct.supplier?.trim() || "",
+      supplier:
+        updatedProduct.supplier?.trim() || "",
       price: Number(updatedProduct.price),
       quantity: Number(updatedProduct.quantity),
-      expiryDate: updatedProduct.expiryDate || null,
+      expiryDate:
+        updatedProduct.expiryDate || null,
     };
 
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: "PUT",
-        headers: getHeaders(),
-        body: JSON.stringify(productData),
-      });
+      const response = await fetch(
+        `${PRODUCTS_URL}/${id}`,
+        {
+          method: "PUT",
+          headers: getHeaders(),
+          body: JSON.stringify(productData),
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to update product");
+      if (response.status === 401) {
+        localStorage.clear();
+        window.location.href = "/";
+        return false;
       }
 
-      const savedProduct = await response.json();
+      if (!response.ok) {
+        const errorText =
+          await response.text();
 
-      setProducts((previousProducts) =>
-        previousProducts.map((product) =>
-          Number(product.id) === Number(id)
-            ? savedProduct
-            : product
-        )
+        console.error(
+          "Update product backend error:",
+          errorText
+        );
+
+        throw new Error(
+          "Failed to update product"
+        );
+      }
+
+      const savedProduct =
+        await response.json();
+
+      setProducts(
+        (previousProducts) =>
+          previousProducts.map(
+            (product) =>
+              Number(product.id) ===
+              Number(id)
+                ? savedProduct
+                : product
+          )
       );
 
       return true;
     } catch (error) {
-      console.error("Update product error:", error);
+      console.error(
+        "Update product error:",
+        error
+      );
+
       throw error;
     }
   };
+
+  // --------------------------------------------------
+  // DELETE PRODUCT
+  // --------------------------------------------------
 
   const deleteProduct = async (id) => {
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: "DELETE",
-        headers: getHeaders(),
-      });
+      const response = await fetch(
+        `${PRODUCTS_URL}/${id}`,
+        {
+          method: "DELETE",
+          headers: getHeaders(),
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to delete product");
+      if (response.status === 401) {
+        localStorage.clear();
+        window.location.href = "/";
+        return false;
       }
 
-      setProducts((previousProducts) =>
-        previousProducts.filter(
-          (product) => Number(product.id) !== Number(id)
-        )
+      if (!response.ok) {
+        const errorText =
+          await response.text();
+
+        console.error(
+          "Delete product backend error:",
+          errorText
+        );
+
+        throw new Error(
+          "Failed to delete product"
+        );
+      }
+
+      setProducts(
+        (previousProducts) =>
+          previousProducts.filter(
+            (product) =>
+              Number(product.id) !==
+              Number(id)
+          )
       );
 
       return true;
     } catch (error) {
-      console.error("Delete product error:", error);
+      console.error(
+        "Delete product error:",
+        error
+      );
+
       throw error;
     }
   };
 
-  const increaseStock = async (id, quantity, supplier = "") => {
+  // --------------------------------------------------
+  // INCREASE STOCK
+  // --------------------------------------------------
+
+  const increaseStock = async (
+    id,
+    quantity,
+    supplier = ""
+  ) => {
     const product = products.find(
-      (item) => Number(item.id) === Number(id)
+      (item) =>
+        Number(item.id) === Number(id)
     );
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new Error(
+        "Product not found"
+      );
     }
 
     const updatedProduct = {
       ...product,
+
       supplier:
-        supplier.trim() || product.supplier || "",
+        supplier.trim() ||
+        product.supplier ||
+        "",
+
       quantity:
-        Number(product.quantity) + Number(quantity),
+        Number(product.quantity) +
+        Number(quantity),
     };
 
-    return await updateProduct(id, updatedProduct);
+    return await updateProduct(
+      id,
+      updatedProduct
+    );
   };
 
-  const decreaseStock = async (id, quantity) => {
+  // --------------------------------------------------
+  // DECREASE STOCK
+  // --------------------------------------------------
+
+  const decreaseStock = async (
+    id,
+    quantity
+  ) => {
     const product = products.find(
-      (item) => Number(item.id) === Number(id)
+      (item) =>
+        Number(item.id) === Number(id)
     );
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new Error(
+        "Product not found"
+      );
     }
 
     const newQuantity =
-      Number(product.quantity) - Number(quantity);
+      Number(product.quantity) -
+      Number(quantity);
 
     if (newQuantity < 0) {
-      throw new Error("Insufficient stock");
+      throw new Error(
+        "Insufficient stock"
+      );
     }
 
     const updatedProduct = {
@@ -218,20 +429,31 @@ export function InventoryProvider({ children }) {
       quantity: newQuantity,
     };
 
-    return await updateProduct(id, updatedProduct);
+    return await updateProduct(
+      id,
+      updatedProduct
+    );
   };
+
+  // --------------------------------------------------
+  // PROVIDER
+  // --------------------------------------------------
 
   return (
     <InventoryContext.Provider
       value={{
         products,
         loading,
+
         addProduct,
         updateProduct,
         deleteProduct,
+
         increaseStock,
         decreaseStock,
+
         loadProducts,
+
         switchUser,
         clearInventory,
       }}
@@ -241,8 +463,13 @@ export function InventoryProvider({ children }) {
   );
 }
 
+// --------------------------------------------------
+// HOOK
+// --------------------------------------------------
+
 export function useInventory() {
-  const context = useContext(InventoryContext);
+  const context =
+    useContext(InventoryContext);
 
   if (!context) {
     throw new Error(
@@ -252,4 +479,3 @@ export function useInventory() {
 
   return context;
 }
-

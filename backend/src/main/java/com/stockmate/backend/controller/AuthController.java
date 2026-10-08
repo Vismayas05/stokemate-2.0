@@ -12,7 +12,7 @@ import com.stockmate.backend.entity.User;
 import com.stockmate.backend.repository.PasswordResetTokenRepository;
 import com.stockmate.backend.repository.ProductRepository;
 import com.stockmate.backend.repository.UserRepository;
-import com.stockmate.backend.controller.EmailService;
+import com.stockmate.backend.security.JwtService;
 
 import jakarta.validation.Valid;
 
@@ -40,6 +40,7 @@ public class AuthController {
     private final PasswordResetTokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final JwtService jwtService;
 
     @Value("${google.client-id}")
     private String googleClientId;
@@ -49,13 +50,15 @@ public class AuthController {
             ProductRepository productRepository,
             PasswordResetTokenRepository tokenRepository,
             PasswordEncoder passwordEncoder,
-            EmailService emailService
+            EmailService emailService,
+            JwtService jwtService
     ) {
         this.userRepository = userRepository;
         this.productRepository = productRepository;
         this.tokenRepository = tokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
+        this.jwtService = jwtService;
     }
 
     // -------------------------
@@ -183,8 +186,10 @@ public class AuthController {
                                 newUser.setName(name);
                                 newUser.setEmail(email);
 
-                                // Google accounts don't need a
-                                // local password initially.
+                                /*
+                                 * Google users don't need
+                                 * a local password initially.
+                                 */
                                 newUser.setPassword(
                                         passwordEncoder.encode(
                                                 UUID.randomUUID().toString()
@@ -225,7 +230,6 @@ public class AuthController {
                 email.trim().toLowerCase();
 
         /*
-         * Important:
          * Don't reveal whether an account exists.
          */
 
@@ -370,8 +374,12 @@ public class AuthController {
             User user
     ) {
 
+        String token =
+                jwtService.generateToken(user.getEmail());
+
         return Map.of(
                 "message", "Login successful",
+                "token", token,
                 "id", String.valueOf(user.getId()),
                 "name", user.getName(),
                 "email", user.getEmail()
