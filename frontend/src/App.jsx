@@ -9,7 +9,7 @@ import Sales from "./pages/Sales";
 import Alerts from "./pages/Alerts";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
-
+import ForgotPassword from "./pages/ForgotPassword";
 import { InventoryProvider } from "./context/InventoryContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
@@ -44,6 +44,14 @@ export default function App() {
                 </AppLayout>
               }
             />
+            <Route
+  path="/forgot-password"
+  element={
+    <AppLayout>
+      <ForgotPassword />
+    </AppLayout>
+  }
+/>
 
             <Route
               path="/dashboard"

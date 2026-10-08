@@ -555,6 +555,14 @@ function Login() {
                   </button>
                 </div>
               </div>
+              <div className="flex justify-end">
+  <Link
+    to="/forgot-password"
+    className="text-sm font-semibold text-emerald-500 transition hover:text-emerald-600"
+  >
+    Forgot password?
+  </Link>
+</div>
 
               {/* Error Message */}
 
