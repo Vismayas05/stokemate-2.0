@@ -8,6 +8,7 @@ import com.stockmate.backend.repository.UserRepository;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,35 +29,69 @@ public class ProductController {
         this.userRepository = userRepository;
     }
 
-    private User getUserByEmail(String email) {
-        if (email == null || email.trim().isEmpty()) {
-            throw new RuntimeException("User email is required");
+    // --------------------------------------------------
+    // GET AUTHENTICATED USER
+    // --------------------------------------------------
+
+    private User getAuthenticatedUser(
+            Authentication authentication
+    ) {
+        if (authentication == null
+                || !authentication.isAuthenticated()) {
+
+            throw new RuntimeException(
+                    "User is not authenticated"
+            );
+        }
+
+        String email =
+                authentication.getName();
+
+        if (email == null
+                || email.trim().isEmpty()) {
+
+            throw new RuntimeException(
+                    "Authenticated user email is missing"
+            );
         }
 
         return userRepository.findByEmail(
                 email.trim().toLowerCase()
         ).orElseThrow(() ->
-                new RuntimeException("User not found")
+                new RuntimeException(
+                        "User not found"
+                )
         );
     }
 
+    // --------------------------------------------------
+    // GET ALL PRODUCTS
+    // --------------------------------------------------
+
     @GetMapping
     public List<Product> getAllProducts(
-            @RequestHeader("X-User-Email") String email
+            Authentication authentication
     ) {
-        User user = getUserByEmail(email);
+        User user =
+                getAuthenticatedUser(authentication);
 
         return productRepository.findByUser(user);
     }
 
+    // --------------------------------------------------
+    // GET PRODUCT BY ID
+    // --------------------------------------------------
+
     @GetMapping("/{id}")
     public Product getProductById(
             @PathVariable Long id,
-            @RequestHeader("X-User-Email") String email
+            Authentication authentication
     ) {
-        User user = getUserByEmail(email);
+        User user =
+                getAuthenticatedUser(authentication);
 
-        return productRepository.findByIdAndUser(id, user)
+        return productRepository
+                .findByIdAndUser(id, user)
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Product not found"
@@ -64,30 +99,45 @@ public class ProductController {
                 );
     }
 
+    // --------------------------------------------------
+    // ADD PRODUCT
+    // --------------------------------------------------
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Product addProduct(
             @Valid @RequestBody Product product,
-            @RequestHeader("X-User-Email") String email
+            Authentication authentication
     ) {
-        User user = getUserByEmail(email);
+        User user =
+                getAuthenticatedUser(authentication);
 
+        // Never trust an ID sent from frontend
         product.setId(null);
+
+        // Always associate product with
+        // the authenticated user
         product.setUser(user);
 
         return productRepository.save(product);
     }
 
+    // --------------------------------------------------
+    // UPDATE PRODUCT
+    // --------------------------------------------------
+
     @PutMapping("/{id}")
     public Product updateProduct(
             @PathVariable Long id,
             @Valid @RequestBody Product updatedProduct,
-            @RequestHeader("X-User-Email") String email
+            Authentication authentication
     ) {
-        User user = getUserByEmail(email);
+        User user =
+                getAuthenticatedUser(authentication);
 
         Product existingProduct =
-                productRepository.findByIdAndUser(id, user)
+                productRepository
+                        .findByIdAndUser(id, user)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Product not found"
@@ -118,18 +168,26 @@ public class ProductController {
                 updatedProduct.getExpiryDate()
         );
 
-        return productRepository.save(existingProduct);
+        return productRepository.save(
+                existingProduct
+        );
     }
+
+    // --------------------------------------------------
+    // DELETE PRODUCT
+    // --------------------------------------------------
 
     @DeleteMapping("/{id}")
     public String deleteProduct(
             @PathVariable Long id,
-            @RequestHeader("X-User-Email") String email
+            Authentication authentication
     ) {
-        User user = getUserByEmail(email);
+        User user =
+                getAuthenticatedUser(authentication);
 
         Product product =
-                productRepository.findByIdAndUser(id, user)
+                productRepository
+                        .findByIdAndUser(id, user)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Product not found"
