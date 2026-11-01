@@ -16,7 +16,9 @@ import { ThemeProvider } from "./context/ThemeContext";
 function AppLayout({ children }) {
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
-      <div className="app-glass p-6 min-h-full">{children}</div>
+      <div className="app-glass p-6 min-h-full">
+        {children}
+      </div>
     </div>
   );
 }
